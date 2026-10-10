@@ -3,6 +3,61 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import './LoginPage.css';
 
+// Konfigurasi logo di halaman login (BKKBN & Badan Gizi Nasional)
+interface LogoConfig {
+  id: string;
+  primarySrc: string;     // file di frontend/public/ (misal: /logo1.png)
+  secondarySrc?: string;   // opsi cadangan (misal: /logo.png)
+  fallbackSvg: string;    // file SVG jika file PNG tidak ditemukan
+  alt: string;
+}
+
+const LOGO_LIST: LogoConfig[] = [
+  {
+    id: 'logo-1',
+    primarySrc: '/logo1.png',
+    secondarySrc: '/logo.png',
+    fallbackSvg: '/logo.svg',
+    alt: 'Kementerian Kependudukan dan Pembangunan Keluarga / BKKBN',
+  },
+  {
+    id: 'logo-2',
+    primarySrc: '/logo2.png',
+    fallbackSvg: '/logo2.svg',
+    alt: 'Badan Gizi Nasional Republik Indonesia',
+  },
+];
+
+const LogoBadge: React.FC<{ logo: LogoConfig }> = ({ logo }) => {
+  const [currentSrc, setCurrentSrc] = useState(logo.primarySrc);
+  const [isFailed, setIsFailed] = useState(false);
+
+  const handleError = () => {
+    if (currentSrc === logo.primarySrc && logo.secondarySrc) {
+      setCurrentSrc(logo.secondarySrc);
+    } else if (currentSrc !== logo.fallbackSvg) {
+      setCurrentSrc(logo.fallbackSvg);
+    } else {
+      setIsFailed(true);
+    }
+  };
+
+  return (
+    <div className="login-logo-item" title={logo.alt}>
+      {!isFailed ? (
+        <img
+          src={currentSrc}
+          alt={logo.alt}
+          className="login-custom-logo"
+          onError={handleError}
+        />
+      ) : (
+        <span className="login-logo-fallback-icon">🏛️</span>
+      )}
+    </div>
+  );
+};
+
 const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -45,12 +100,20 @@ const LoginPage: React.FC = () => {
       <div className="login-bg-orb login-bg-orb-2" />
 
       <div className="login-container fade-in">
-        {/* Logo */}
+        {/* Multi-Logo Header */}
         <div className="login-logo">
-          <div className="login-logo-icon">📋</div>
-          <div>
+          <div className="login-logos-container">
+            {LOGO_LIST.map((item, idx) => (
+              <React.Fragment key={item.id}>
+                {idx > 0 && <div className="login-logo-divider" />}
+                <LogoBadge logo={item} />
+              </React.Fragment>
+            ))}
+          </div>
+
+          <div className="login-logo-text">
             <h1 className="login-logo-title">AbsenQR</h1>
-            <p className="login-logo-subtitle">Sistem Absensi Digital</p>
+            <p className="login-logo-subtitle">Sistem Absensi Digital MBG</p>
           </div>
         </div>
 
