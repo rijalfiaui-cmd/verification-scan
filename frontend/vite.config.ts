@@ -7,8 +7,13 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true, // Expose ke jaringan lokal untuk akses dari HP
+    allowedHosts: true,
     proxy: {
       '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/uploads': {
         target: 'http://localhost:3000',
         changeOrigin: true,
       },

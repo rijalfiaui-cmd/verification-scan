@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { attendanceApi, ScanResult } from '../api/attendance';
+import { attendanceApi, type ScanResult } from '../api/attendance';
 import { useAuth } from '../context/AuthContext';
 import StudentCard from '../components/StudentCard';
 import './ScanPage.css';

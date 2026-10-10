@@ -164,7 +164,7 @@ export class AttendanceService {
       this.prisma.attendance.count({ where }),
     ]);
 
-    const formattedRecords = records.map((r) => ({
+    const formattedRecords = records.map((r: any) => ({
       id: r.id,
       attendanceDate: format(
         toZonedTime(r.attendanceDate, TIMEZONE),

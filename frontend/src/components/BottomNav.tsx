@@ -1,9 +1,8 @@
 import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import './BottomNav.css';
 
 const BottomNav: React.FC = () => {
-  const location = useLocation();
 
   return (
     <nav className="nav-tabs safe-bottom">

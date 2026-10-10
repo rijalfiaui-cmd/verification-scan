@@ -11,7 +11,7 @@ import { JwtStrategy } from './jwt.strategy';
     JwtModule.registerAsync({
       useFactory: () => ({
         secret: process.env.JWT_SECRET || 'default-secret-change-me',
-        signOptions: { expiresIn: process.env.JWT_EXPIRES_IN || '24h' },
+        signOptions: { expiresIn: (process.env.JWT_EXPIRES_IN || '24h') as any },
       }),
     }),
   ],

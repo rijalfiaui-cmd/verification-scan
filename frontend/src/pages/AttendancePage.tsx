@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { attendanceApi, AttendanceRecord } from '../api/attendance';
+import { attendanceApi, type AttendanceRecord } from '../api/attendance';
 import { useAuth } from '../context/AuthContext';
 import './AttendancePage.css';
 
