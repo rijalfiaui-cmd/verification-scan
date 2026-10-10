@@ -1,0 +1,70 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Gender {
+  LAKI_LAKI
+  PEREMPUAN
+}
+
+enum AttendanceStatus {
+  HADIR
+}
+
+model Student {
+  id               String      @id @default(uuid())
+  nisn             String      @unique
+  name             String
+  schoolName       String
+  gender           Gender
+  foodRestrictions String?
+  photoPath        String?
+  qrToken          String      @unique @default(uuid())
+  isActive         Boolean     @default(true)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  attendances      Attendance[]
+
+  @@index([nisn])
+  @@index([qrToken])
+  @@map("students")
+}
+
+model Staff {
+  id          String       @id @default(uuid())
+  username    String       @unique
+  name        String
+  password    String
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  attendances Attendance[]
+
+  @@index([username])
+  @@map("staff")
+}
+
+model Attendance {
+  id             String           @id @default(uuid())
+  studentId      String
+  staffId        String
+  attendanceDate DateTime         @db.Date
+  scannedAt      DateTime
+  status         AttendanceStatus @default(HADIR)
+
+  student        Student  @relation(fields: [studentId], references: [id])
+  staff          Staff    @relation(fields: [staffId], references: [id])
+
+  @@unique([studentId, attendanceDate])
+  @@index([attendanceDate])
+  @@index([studentId])
+  @@map("attendances")
+}

@@ -1,0 +1,39 @@
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Global validation pipe
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+
+  // Global prefix
+  app.setGlobalPrefix('api/v1');
+
+  // Static file serving untuk foto siswa
+  const uploadDir = process.env.UPLOAD_DIR || 'uploads';
+  app.useStaticAssets(join(process.cwd(), uploadDir), {
+    prefix: '/uploads',
+  });
+
+  // CORS
+  app.enableCors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    credentials: true,
+  });
+
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
+  console.log(`🚀 Backend berjalan di http://localhost:${port}/api/v1`);
+}
+
+bootstrap();
