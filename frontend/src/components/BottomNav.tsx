@@ -3,7 +3,6 @@ import { NavLink } from 'react-router-dom';
 import './BottomNav.css';
 
 const BottomNav: React.FC = () => {
-
   return (
     <nav className="nav-tabs safe-bottom">
       <NavLink
@@ -13,6 +12,14 @@ const BottomNav: React.FC = () => {
       >
         <span className="nav-tab-icon">📷</span>
         <span>Scan QR</span>
+      </NavLink>
+      <NavLink
+        to="/admin"
+        className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}
+        id="nav-admin"
+      >
+        <span className="nav-tab-icon">👥</span>
+        <span>Data Siswa</span>
       </NavLink>
       <NavLink
         to="/attendance"

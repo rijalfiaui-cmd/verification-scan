@@ -8,6 +8,7 @@ import { useAuth } from './context/AuthContext';
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const ScanPage = lazy(() => import('./pages/ScanPage'));
 const AttendancePage = lazy(() => import('./pages/AttendancePage'));
+const AdminStudentsPage = lazy(() => import('./pages/AdminStudentsPage'));
 
 const LoadingFallback = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
@@ -36,6 +37,18 @@ const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+                <AdminStudentsPage />
+                <BottomNav />
+              </div>
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/students" element={<Navigate to="/admin" replace />} />
         <Route
           path="/attendance"
           element={

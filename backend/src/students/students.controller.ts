@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -91,5 +92,10 @@ export class StudentsController {
     const qrDataUrl = await this.studentsService.generateQrCode(id);
     // Kembalikan sebagai data URL
     res.json({ qrDataUrl });
+  }
+
+  @Delete(':id')
+  remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.studentsService.remove(id);
   }
 }

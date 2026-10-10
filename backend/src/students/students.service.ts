@@ -21,10 +21,16 @@ export class StudentsService {
       throw new ConflictException(`NISN ${dto.nisn} sudah terdaftar`);
     }
 
-    return this.prisma.student.create({
+    const student = await this.prisma.student.create({
       data: dto,
-      select: this.studentSelect(),
     });
+
+    const qrDataUrl = await this.generateQrCode(student.id);
+
+    return {
+      ...student,
+      qrDataUrl,
+    };
   }
 
   async findAll(
@@ -103,6 +109,16 @@ export class StudentsService {
       where: { id },
       data: { photoPath },
       select: this.studentSelect(),
+    });
+  }
+
+  async remove(id: string) {
+    await this.findOne(id);
+    await this.prisma.attendance.deleteMany({
+      where: { studentId: id },
+    });
+    return this.prisma.student.delete({
+      where: { id },
     });
   }
 
