@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { studentsApi, type Student, type CreateStudentPayload } from '../api/students';
 import { useAuth } from '../context/AuthContext';
 import './AdminStudentsPage.css';
+import PhotoInput from '../components/PhotoInput';
+import { photoUrl, apiErrorMessage } from '../api/client';
+import { NavLink } from 'react-router-dom';
 
 const AdminStudentsPage: React.FC = () => {
   const { staff, logout } = useAuth();
@@ -26,8 +29,7 @@ const AdminStudentsPage: React.FC = () => {
     isActive: true,
   });
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [editPhoto, setEditPhoto] = useState<File | null>(null);
 
   // State Modal QR Code Viewer
   const [activeQrStudent, setActiveQrStudent] = useState<(Student & { qrDataUrl?: string }) | null>(null);
@@ -61,15 +63,6 @@ const AdminStudentsPage: React.FC = () => {
     fetchStudents();
   }, [fetchStudents]);
 
-  // Handle Photo Selection
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setSelectedPhoto(file);
-      setPhotoPreview(URL.createObjectURL(file));
-    }
-  };
-
   // Reset Add Form
   const resetAddForm = () => {
     setFormData({
@@ -81,9 +74,7 @@ const AdminStudentsPage: React.FC = () => {
       isActive: true,
     });
     setSelectedPhoto(null);
-    setPhotoPreview(null);
     setFormError('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   // Submit Tambah Siswa Baru
@@ -124,7 +115,7 @@ const AdminStudentsPage: React.FC = () => {
           const photoRes = await studentsApi.uploadPhoto(newStudent.id, selectedPhoto);
           updatedWithPhoto = { ...newStudent, photoPath: photoRes.photoPath };
         } catch {
-          console.warn('Foto gagal diupload, namun data siswa tetap tersimpan');
+          alert('Data siswa berhasil disimpan, tetapi foto gagal diunggah. Buka Edit untuk mencoba unggah foto lagi.');
         }
       }
 
@@ -204,6 +195,8 @@ const AdminStudentsPage: React.FC = () => {
   // Edit Siswa
   const handleOpenEdit = (student: Student) => {
     setEditingStudent(student);
+    setEditPhoto(null);
+    setFormError('');
     setIsEditModalOpen(true);
   };
 
@@ -216,14 +209,21 @@ const AdminStudentsPage: React.FC = () => {
         name: editingStudent.name,
         schoolName: editingStudent.schoolName,
         gender: editingStudent.gender as 'LAKI_LAKI' | 'PEREMPUAN',
-        foodRestrictions: editingStudent.foodRestrictions || undefined,
+        foodRestrictions: editingStudent.foodRestrictions || '',
         isActive: editingStudent.isActive,
       });
+      if (editPhoto) {
+        try { await studentsApi.uploadPhoto(editingStudent.id, editPhoto); }
+        catch (error) {
+          setFormError(apiErrorMessage(error, 'Data siswa tersimpan, tetapi foto gagal diunggah. Coba simpan kembali.'));
+          return;
+        }
+      }
       setIsEditModalOpen(false);
       setEditingStudent(null);
       await fetchStudents();
-    } catch {
-      alert('Gagal memperbarui data siswa');
+    } catch (err) {
+      setFormError(apiErrorMessage(err, 'Gagal memperbarui data siswa'));
     } finally {
       setIsSubmitting(false);
     }
@@ -274,6 +274,11 @@ const AdminStudentsPage: React.FC = () => {
           </button>
         </div>
       </header>
+
+      <nav className="beneficiary-tabs" aria-label="Jenis penerima manfaat">
+        <NavLink className="btn btn-primary" to="/admin">Siswa</NavLink>
+        <NavLink className="btn btn-secondary" to="/beneficiaries-3b">3B-Lansia</NavLink>
+      </nav>
 
       {/* Metrics Row */}
       <section className="admin-stats-grid">
@@ -390,7 +395,7 @@ const AdminStudentsPage: React.FC = () => {
                     <div className="student-profile-cell">
                       {student.photoPath ? (
                         <img
-                          src={student.photoPath}
+                          src={photoUrl(student.photoPath)}
                           alt={student.name}
                           className="student-avatar"
                           onError={(e) => {
@@ -597,34 +602,7 @@ const AdminStudentsPage: React.FC = () => {
                   </small>
                 </div>
 
-                {/* Foto Siswa */}
-                <div className="form-group">
-                  <label className="form-label">Foto Siswa (Opsional)</label>
-                  <div className="photo-upload-container">
-                    <div className="photo-preview-avatar">
-                      {photoPreview ? (
-                        <img
-                          src={photoPreview}
-                          alt="Preview"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }}
-                        />
-                      ) : (
-                        '📷'
-                      )}
-                    </div>
-                    <div className="photo-upload-info">
-                      <span>Pilih Foto Siswa</span>
-                      <small>Format: JPG, PNG, WEBP (Maksimal 5MB)</small>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handlePhotoChange}
-                        style={{ marginTop: 6, fontSize: 12, color: 'var(--color-text-secondary)' }}
-                      />
-                    </div>
-                  </div>
-                </div>
+                <PhotoInput value={selectedPhoto} onChange={setSelectedPhoto} disabled={isSubmitting} />
               </div>
 
               <div className="modal-footer">
@@ -684,7 +662,7 @@ const AdminStudentsPage: React.FC = () => {
                     <h4 className="card-school-name">{activeQrStudent.schoolName}</h4>
                   </div>
                   <span className="badge-status-active">
-                    <span className="status-dot" /> AKTIF
+                    <span className="status-dot" /> {activeQrStudent.isActive ? 'AKTIF' : 'NONAKTIF'}
                   </span>
                 </div>
 
@@ -774,6 +752,8 @@ const AdminStudentsPage: React.FC = () => {
 
             <form onSubmit={handleEditSubmit}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {formError && <div className="alert alert-error" role="alert">{formError}</div>}
+                <PhotoInput value={editPhoto} onChange={setEditPhoto} existingUrl={editingStudent.photoPath} disabled={isSubmitting} />
                 <div className="form-group">
                   <label className="form-label">NISN (Tetap)</label>
                   <input

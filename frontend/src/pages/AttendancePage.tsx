@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { attendanceApi, type AttendanceRecord } from '../api/attendance';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { attendanceApi, type RecipientType, type AttendanceRecord } from '../api/attendance';
 import { useAuth } from '../context/AuthContext';
 import './AttendancePage.css';
 
@@ -12,34 +12,41 @@ const AttendancePage: React.FC = () => {
     // Default: hari ini dalam WIB
     return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
   });
+  const [type, setType] = useState<RecipientType | ''>('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const LIMIT = 20;
+  const requestId = useRef(0);
 
   const fetchRecords = useCallback(async () => {
+    const request = ++requestId.current;
     setIsLoading(true);
     setError('');
     try {
       const res = await attendanceApi.getAll({
         page,
+        type: type || undefined,
         limit: LIMIT,
         date: date || undefined,
         search: search || undefined,
       });
+      if (request !== requestId.current) return;
       setRecords(res.data);
       setTotalPages(res.meta.totalPages);
       setTotal(res.meta.total);
     } catch {
+      if (request !== requestId.current) return;
       setError('Gagal memuat data absensi. Periksa koneksi internet Anda.');
     } finally {
-      setIsLoading(false);
+      if (request === requestId.current) setIsLoading(false);
     }
-  }, [page, date, search]);
+  }, [page, date, search, type]);
 
   useEffect(() => {
-    fetchRecords();
+    void fetchRecords();
+    return () => { requestId.current++; };
   }, [fetchRecords]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,6 +96,11 @@ const AttendancePage: React.FC = () => {
       <main className="attendance-main">
         {/* Filter Section */}
         <div className="filter-section card">
+          <label className="form-group" style={{ marginBottom: 16 }}><span className="form-label">Jenis Penerima Manfaat</span>
+            <select aria-label="Jenis Penerima Manfaat" className="form-input" value={type} onChange={(e) => { setType(e.target.value as RecipientType | ''); setPage(1); }}>
+              <option value="">Semua</option><option value="STUDENT">Siswa</option><option value="THREE_B_ELDERLY">3B-Lansia</option>
+            </select>
+          </label>
           <div className="filter-row">
             <div className="form-group filter-item">
               <label className="form-label" htmlFor="filter-date">Tanggal</label>
@@ -106,7 +118,7 @@ const AttendancePage: React.FC = () => {
                 id="filter-search"
                 type="search"
                 className="form-input"
-                placeholder="Nama atau NISN..."
+                placeholder="Nama, NISN, atau NIK..."
                 value={search}
                 onChange={handleSearchChange}
               />
@@ -117,7 +129,7 @@ const AttendancePage: React.FC = () => {
           <div className="stats-row">
             <div className="stat-item">
               <span className="stat-number">{total}</span>
-              <span className="stat-label">Siswa Hadir</span>
+              <span className="stat-label">Penerima Hadir</span>
             </div>
             <div className="stat-divider" />
             <div className="stat-item">
@@ -154,7 +166,7 @@ const AttendancePage: React.FC = () => {
             <div className="empty-icon">📭</div>
             <p className="empty-title">Tidak ada data absensi</p>
             <p className="empty-sub">
-              {search ? `Tidak ada hasil untuk "${search}"` : 'Belum ada siswa yang absen pada tanggal ini'}
+              {search ? `Tidak ada hasil untuk "${search}"` : 'Belum ada penerima manfaat yang absen pada tanggal ini'}
             </p>
           </div>
         )}
@@ -165,15 +177,16 @@ const AttendancePage: React.FC = () => {
               <div className="attendance-item card fade-in" key={record.id} style={{ animationDelay: `${idx * 30}ms` }}>
                 <div className="attendance-item-left">
                   <div className="attendance-avatar">
-                    {record.student.name.charAt(0).toUpperCase()}
+                    {record.recipient.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="attendance-info">
-                    <div className="attendance-name">{record.student.name}</div>
-                    <div className="attendance-nisn">NISN: {record.student.nisn}</div>
-                    <div className="attendance-school">{record.student.schoolName}</div>
-                    {record.student.foodRestrictions && (
+                    <div className="attendance-school">{record.recipient.type === 'STUDENT' ? 'Siswa' : '3B-Lansia'}</div>
+                    <div className="attendance-name">{record.recipient.name}</div>
+                    <div className="attendance-nisn">{record.recipient.type === 'STUDENT' ? 'NISN' : 'NIK'}: {record.recipient.identifier}</div>
+                    <div className="attendance-school">{record.recipient.type === 'STUDENT' ? record.recipient.schoolName : record.recipient.address}</div>
+                    {record.recipient.foodRestrictions && (
                       <div className="attendance-food-warning">
-                        ⚠️ {record.student.foodRestrictions}
+                        ⚠️ {record.recipient.foodRestrictions}
                       </div>
                     )}
                   </div>
@@ -181,7 +194,7 @@ const AttendancePage: React.FC = () => {
                 <div className="attendance-item-right">
                   <span className="badge badge-success">HADIR</span>
                   <div className="attendance-time">{formatTime(record.scannedAt)}</div>
-                  <div className="attendance-gender">{formatGender(record.student.gender)}</div>
+                  <div className="attendance-gender">{record.recipient.type === 'STUDENT' ? formatGender(record.recipient.gender || '') : `Desil ${record.recipient.decile}`}</div>
                 </div>
               </div>
             ))}

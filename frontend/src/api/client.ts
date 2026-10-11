@@ -28,3 +28,19 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+// Uploaded photos use the API host when the frontend connects to another origin.
+export const photoUrl = (path?: string | null): string | undefined => {
+  if (!path) return undefined;
+  const apiBase = new URL(import.meta.env.VITE_API_URL || '/api/v1', window.location.origin);
+  return new URL(path, apiBase.origin).href;
+};
+
+export const apiErrorMessage = (error: unknown, fallback: string): string => {
+  if (axios.isAxiosError(error)) {
+    const message = error.response?.data?.message;
+    if (Array.isArray(message)) return message.join(', ');
+    if (typeof message === 'string') return message;
+  }
+  return fallback;
+};

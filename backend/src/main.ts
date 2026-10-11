@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { join } from 'path';
+import { resolve } from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -21,7 +21,7 @@ async function bootstrap() {
 
   // Static file serving untuk foto siswa
   const uploadDir = process.env.UPLOAD_DIR || 'uploads';
-  app.useStaticAssets(join(process.cwd(), uploadDir), {
+  app.useStaticAssets(resolve(process.cwd(), uploadDir), {
     prefix: '/uploads',
   });
 

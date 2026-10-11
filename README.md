@@ -245,3 +245,76 @@ npm run build               # Build production
 | Koneksi ke backend gagal | Periksa FRONTEND_URL di `.env` backend dan `VITE_API_URL` di frontend |
 | Migration gagal | Pastikan PostgreSQL berjalan dan `DATABASE_URL` benar |
 | Seed gagal | Jalankan `npx prisma migrate reset` lalu `npx prisma db seed` |
+
+## Penerima manfaat 3B-Lansia
+
+Menu **Penerima Manfaat** menyediakan tab **Siswa** dan **3B-Lansia**. Kelompok
+3B-Lansia memiliki nama, NIK unik 16 digit (disimpan sebagai teks), jalan, RT,
+RW, kelurahan, kecamatan, kabupaten/kota, provinsi, kode pos 5 digit, pantangan
+makanan, desil bilangan bulat 1–10, status aktif, dan foto opsional.
+
+Kedua jenis penerima manfaat menggunakan pemindai QR dan rekap yang sama.
+Rekap dapat difilter berdasarkan jenis penerima, tanggal, nama, NISN, atau NIK.
+QR hanya berisi UUID acak. Setiap penerima hanya dapat dicatat sekali per hari
+WIB; penerima nonaktif ditolak. Data dan QR siswa yang sudah ada tetap berlaku.
+
+Pada form tambah maupun edit tersedia **Pilih Foto** dan **Ambil Foto**.
+Kamera meminta izin browser, menampilkan pratinjau, lalu menyimpan gambar ketika
+**Ambil Gambar** ditekan. Kamera memerlukan HTTPS atau localhost. Foto JPG, PNG,
+dan WEBP dibatasi 5 MB; `UPLOAD_DIR` menentukan direktori penyimpanan. Foto gagal
+unggah dapat dicoba kembali melalui form edit tanpa membuat data baru.
+
+API baru (memerlukan JWT):
+
+| Metode | Endpoint | Fungsi |
+|---|---|---|
+| GET / POST | `/api/v1/beneficiaries-3b` | Daftar dengan paginasi / tambah |
+| GET / PATCH / DELETE | `/api/v1/beneficiaries-3b/:id` | Detail / edit / hapus beserta absensinya |
+| GET | `/api/v1/beneficiaries-3b/:id/qr` | QR PNG dalam data URL |
+| POST | `/api/v1/beneficiaries-3b/:id/photo` | Unggah multipart field `photo` |
+
+Respons scan dan rekap menyertakan `recipient` dengan `type` (`STUDENT` atau
+`THREE_B_ELDERLY`), `identifier`, nama, pantangan, foto, dan detail jenis penerima.
+Field `student` dipertahankan untuk data siswa. Parameter rekap `type` menerima
+`STUDENT` atau `THREE_B_ELDERLY`; tanpa parameter ini kedua jenis ditampilkan.
+
+### Migrasi database tanpa reset
+
+Tabel baru `beneficiaries_3b` terhubung ke `attendances.beneficiary3BId`.
+`studentId` menjadi opsional; constraint database memastikan setiap absensi
+memiliki tepat satu penerima, serta unik per penerima per hari.
+
+Untuk database **baru/kosong**, dari direktori `backend`:
+
+```bash
+npm run db:deploy
+npm run db:generate
+```
+
+Untuk instalasi **lama yang belum memiliki riwayat Prisma Migrate**, pastikan
+skema awal sesuai dengan `prisma/migrations/0_init/migration.sql`, lalu tandai
+baseline sebelum menerapkan migrasi tambahan:
+
+```bash
+npx prisma migrate resolve --applied 0_init
+npm run db:deploy
+npm run db:generate
+```
+
+Database lokal pada implementasi ini sudah melalui baseline dan migrasi tersebut.
+Untuk deployment berikutnya cukup `npm run db:deploy` dan `npm run db:generate`.
+Jangan menjalankan `migrate reset` atau seed untuk upgrade: seed lama menghapus
+data aplikasi. Setelah upgrade, build/restart backend dan frontend bersama-sama.
+
+### Pengujian integrasi
+
+```bash
+cd backend
+npm run test:integration
+```
+
+Tes membuat skema PostgreSQL sementara pada server dari `DATABASE_URL`, menerapkan
+migrasi, menguji API autentikasi, CRUD, validasi, foto, absensi kedua jenis,
+duplikasi bersamaan, filter, waktu WIB, dan constraint database. Skema serta foto
+tes dihapus setelah selesai; data aplikasi tidak diubah. Akun database untuk tes
+memerlukan izin membuat dan menghapus skema sementara.

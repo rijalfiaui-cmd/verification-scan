@@ -1,3 +1,4 @@
+import { GetAttendanceQueryDto } from './dto/get-attendance-query.dto';
 import {
   Controller,
   Post,
@@ -6,8 +7,6 @@ import {
   Param,
   Query,
   UseGuards,
-  ParseIntPipe,
-  DefaultValuePipe,
   ParseUUIDPipe,
 } from '@nestjs/common';
 import { AttendanceService } from './attendance.service';
@@ -21,21 +20,19 @@ export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
   @Post('scan')
-  scan(
-    @Body() dto: ScanAttendanceDto,
-    @CurrentUser() user: { id: string },
-  ) {
+  scan(@Body() dto: ScanAttendanceDto, @CurrentUser() user: { id: string }) {
     return this.attendanceService.scan(dto, user.id);
   }
 
   @Get()
-  findAll(
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
-    @Query('date') date?: string,
-    @Query('search') search?: string,
-  ) {
-    return this.attendanceService.findAll(page, limit, date, search);
+  findAll(@Query() query: GetAttendanceQueryDto) {
+    return this.attendanceService.findAll(
+      query.page,
+      query.limit,
+      query.date,
+      query.search,
+      query.type,
+    );
   }
 
   @Get(':id')

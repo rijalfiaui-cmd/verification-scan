@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { attendanceApi, type ScanResult } from '../api/attendance';
 import { useAuth } from '../context/AuthContext';
-import StudentCard from '../components/StudentCard';
+import RecipientCard from '../components/RecipientCard';
+import { apiErrorMessage } from '../api/client';
 import './ScanPage.css';
 
 type ScanState = 'idle' | 'scanning' | 'processing' | 'result' | 'error';
@@ -12,6 +13,7 @@ const ScanPage: React.FC = () => {
   const [scanState, setScanState] = useState<ScanState>('idle');
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
+  const [restartRequested, setRestartRequested] = useState(false);
   const [cameraError, setCameraError] = useState('');
 
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
@@ -77,16 +79,17 @@ const ScanPage: React.FC = () => {
                 message: 'QR Code tidak valid',
               });
               setScanState('result');
-            } else if (errData?.status === 'inactive_student') {
+            } else if (errData?.status === 'inactive_student' || errData?.status === 'inactive_beneficiary') {
               setScanResult({
-                status: 'inactive_student',
-                message: errData.message || 'Siswa tidak aktif',
+                status: errData.status,
+                recipient: (errData as ScanResult).recipient,
+                message: errData.message || 'Penerima manfaat tidak aktif',
                 student: (errData as ScanResult).student,
               });
               setScanState('result');
             } else {
               setErrorMessage(
-                errData?.message || 'Gagal terhubung ke server. Periksa koneksi internet.',
+                apiErrorMessage(err, 'Gagal terhubung ke server. Periksa koneksi internet.'),
               );
               setScanState('error');
             }
@@ -113,11 +116,20 @@ const ScanPage: React.FC = () => {
     };
   }, [stopScanner]);
 
+  useEffect(() => {
+    if (restartRequested && scanState === 'idle') {
+      setRestartRequested(false);
+      void startScanner();
+    }
+  }, [restartRequested, scanState, startScanner]);
+
   const handleNextScan = () => {
     setScanResult(null);
     setErrorMessage('');
     setCameraError('');
-    startScanner();
+    html5QrCodeRef.current = null;
+    setScanState('idle');
+    setRestartRequested(true);
   };
 
   const getStatusConfig = (status: string) => {
@@ -128,8 +140,9 @@ const ScanPage: React.FC = () => {
         return { emoji: '⚠️', label: 'Sudah Absen', className: 'status-warning' };
       case 'invalid_qr':
         return { emoji: '❌', label: 'QR Tidak Valid', className: 'status-danger' };
+      case 'inactive_beneficiary':
       case 'inactive_student':
-        return { emoji: '🚫', label: 'Siswa Tidak Aktif', className: 'status-danger' };
+        return { emoji: '🚫', label: 'Penerima Tidak Aktif', className: 'status-danger' };
       default:
         return { emoji: '❓', label: 'Status Tidak Diketahui', className: 'status-warning' };
     }
@@ -218,7 +231,7 @@ const ScanPage: React.FC = () => {
             {scanState === 'scanning' && (
               <div className="scanning-indicator">
                 <div className="scanning-dot" />
-                <span>Mengarahkan kamera ke QR Code siswa...</span>
+                <span>Mengarahkan kamera ke QR Code penerima manfaat...</span>
               </div>
             )}
           </div>
@@ -232,7 +245,7 @@ const ScanPage: React.FC = () => {
               <div className="processing-ring" />
             </div>
             <p className="processing-text">Memverifikasi QR Code...</p>
-            <p className="processing-sub">Sedang memeriksa data siswa</p>
+            <p className="processing-sub">Sedang memeriksa data penerima manfaat</p>
           </div>
         )}
 
@@ -275,11 +288,10 @@ const ScanPage: React.FC = () => {
             })()}
 
             {/* Student Card */}
-            {scanResult.student && (
-              <StudentCard
-                student={scanResult.student}
+            {scanResult.recipient && (
+              <RecipientCard
+                recipient={scanResult.recipient}
                 attendance={scanResult.attendance}
-                status={scanResult.status}
               />
             )}
 

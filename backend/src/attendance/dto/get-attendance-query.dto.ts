@@ -1,4 +1,10 @@
-import { IsString, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsIn,
+  IsDateString,
+  Matches,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { IsInt, Min, Max } from 'class-validator';
 
@@ -17,8 +23,13 @@ export class GetAttendanceQueryDto {
   limit?: number = 20;
 
   @IsOptional()
-  @IsString()
+  @IsDateString({ strict: true })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
   date?: string;
+
+  @IsOptional()
+  @IsIn(['STUDENT', 'THREE_B_ELDERLY'])
+  type?: 'STUDENT' | 'THREE_B_ELDERLY';
 
   @IsOptional()
   @IsString()

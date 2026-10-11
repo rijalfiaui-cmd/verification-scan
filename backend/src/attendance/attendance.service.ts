@@ -5,113 +5,106 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScanAttendanceDto } from './dto/scan-attendance.dto';
-import { Prisma } from '@prisma/client';
-import { toZonedTime, format } from 'date-fns-tz';
+import { Prisma, Student, Beneficiary3B } from '@prisma/client';
+import { formatInTimeZone } from 'date-fns-tz';
+import { beneficiarySelect } from '../beneficiaries/beneficiaries.service';
 
 const TIMEZONE = 'Asia/Jakarta';
+const studentSelect = {
+  id: true,
+  name: true,
+  nisn: true,
+  schoolName: true,
+  gender: true,
+  foodRestrictions: true,
+  photoPath: true,
+  isActive: true,
+} satisfies Prisma.StudentSelect;
+const attendanceInclude = {
+  student: { select: studentSelect },
+  beneficiary3B: { select: beneficiarySelect },
+  staff: { select: { name: true, username: true } },
+} satisfies Prisma.AttendanceInclude;
+type StudentData = Pick<Student, keyof typeof studentSelect>;
+type BeneficiaryData = Pick<Beneficiary3B, keyof typeof beneficiarySelect>;
+export type RecipientType = 'STUDENT' | 'THREE_B_ELDERLY';
 
 @Injectable()
 export class AttendanceService {
   constructor(private readonly prisma: PrismaService) {}
 
   async scan(dto: ScanAttendanceDto, staffId: string) {
-    const { qrToken } = dto;
-
-    // 1. Cari siswa berdasarkan QR token
     const student = await this.prisma.student.findUnique({
-      where: { qrToken },
-      select: {
-        id: true,
-        nisn: true,
-        name: true,
-        schoolName: true,
-        gender: true,
-        foodRestrictions: true,
-        photoPath: true,
-        isActive: true,
-      },
+      where: { qrToken: dto.qrToken },
+      select: studentSelect,
     });
-
-    if (!student) {
+    const beneficiary = student
+      ? null
+      : await this.prisma.beneficiary3B.findUnique({
+          where: { qrToken: dto.qrToken },
+          select: beneficiarySelect,
+        });
+    const person = student || beneficiary;
+    if (!person)
       throw new NotFoundException({
         status: 'invalid_qr',
-        message: 'QR Code tidak valid atau siswa tidak ditemukan',
+        message: 'QR Code tidak valid atau penerima manfaat tidak ditemukan',
       });
-    }
-
-    if (!student.isActive) {
+    const recipient = this.formatRecipient(student, beneficiary);
+    // Keep the student response for older clients using student QR codes.
+    const legacyStudent = student
+      ? {
+          ...student,
+          gender: student.gender === 'LAKI_LAKI' ? 'Laki-laki' : 'Perempuan',
+          photoUrl: student.photoPath,
+        }
+      : undefined;
+    if (!person.isActive)
       throw new ForbiddenException({
-        status: 'inactive_student',
-        message: 'Siswa tidak aktif',
-        student: {
-          name: student.name,
-          nisn: student.nisn,
-          schoolName: student.schoolName,
-        },
+        status: student ? 'inactive_student' : 'inactive_beneficiary',
+        message: 'Penerima manfaat tidak aktif',
+        recipient,
+        student: legacyStudent,
       });
-    }
-
-    // 2. Hitung tanggal absensi dalam timezone Jakarta
-    const nowUtc = new Date();
-    const nowJakarta = toZonedTime(nowUtc, TIMEZONE);
-    const attendanceDateStr = format(nowJakarta, 'yyyy-MM-dd', { timeZone: TIMEZONE });
-    // Simpan sebagai midnight UTC untuk kolom Date
-    const attendanceDate = new Date(`${attendanceDateStr}T00:00:00.000Z`);
-
-    // 3. Coba buat attendance record — biarkan DB unique constraint yang mencegah duplikasi
+    const now = new Date();
+    const date = formatInTimeZone(now, TIMEZONE, 'yyyy-MM-dd');
+    const attendanceDate = new Date(`${date}T00:00:00.000Z`);
+    const identity = student
+      ? { studentId: student.id }
+      : { beneficiary3BId: beneficiary!.id };
     try {
       const attendance = await this.prisma.attendance.create({
         data: {
-          studentId: student.id,
+          ...identity,
           staffId,
           attendanceDate,
-          scannedAt: nowUtc,
+          scannedAt: now,
           status: 'HADIR',
         },
       });
-
       return {
         status: 'recorded',
         message: 'Absensi berhasil dicatat',
-        student: this.formatStudent(student),
-        attendance: {
-          date: attendanceDateStr,
-          time: nowJakarta.toISOString().replace('Z', '+07:00'),
-          id: attendance.id,
-        },
+        recipient,
+        student: legacyStudent,
+        attendance: { id: attendance.id, date, time: this.formatTime(now) },
       };
     } catch (error) {
-      // Unique constraint violation — siswa sudah absen hari ini
       if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        // Ambil data attendance yang sudah ada
-        const existing = await this.prisma.attendance.findFirst({
-          where: { studentId: student.id, attendanceDate },
-          select: { scannedAt: true },
-        });
-
-        const existingTimeJakarta = existing
-          ? toZonedTime(existing.scannedAt, TIMEZONE)
-          : nowJakarta;
-
-        return {
-          status: 'already_present',
-          message: 'Siswa sudah melakukan absensi hari ini',
-          student: {
-            name: student.name,
-            nisn: student.nisn,
-            schoolName: student.schoolName,
-          },
-          attendance: {
-            date: attendanceDateStr,
-            time: existingTimeJakarta.toISOString().replace('Z', '+07:00'),
-          },
-        };
-      }
-
-      throw error;
+        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+        error.code !== 'P2002'
+      )
+        throw error;
+      const existing = await this.prisma.attendance.findFirst({
+        where: { ...identity, attendanceDate },
+      });
+      return {
+        status: 'already_present',
+        message: 'Penerima manfaat sudah melakukan absensi hari ini',
+        recipient,
+        student: legacyStudent,
+        attendance: { date, time: this.formatTime(existing?.scannedAt || now) },
+      };
     }
   }
 
@@ -120,128 +113,92 @@ export class AttendanceService {
     limit = 20,
     dateStr?: string,
     search?: string,
+    type?: RecipientType,
   ) {
-    const skip = (page - 1) * limit;
-
     const where: Prisma.AttendanceWhereInput = {};
-
-    if (dateStr) {
-      const date = new Date(`${dateStr}T00:00:00.000Z`);
-      where.attendanceDate = date;
-    }
-
-    if (search) {
-      where.student = {
-        OR: [
-          { name: { contains: search, mode: 'insensitive' } },
-          { nisn: { contains: search, mode: 'insensitive' } },
-        ],
-      };
-    }
-
+    if (dateStr) where.attendanceDate = new Date(`${dateStr}T00:00:00.000Z`);
+    if (type === 'STUDENT') where.studentId = { not: null };
+    if (type === 'THREE_B_ELDERLY') where.beneficiary3BId = { not: null };
+    if (search)
+      where.OR = [
+        {
+          student: {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' } },
+              { nisn: { contains: search } },
+            ],
+          },
+        },
+        {
+          beneficiary3B: {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' } },
+              { nik: { contains: search } },
+            ],
+          },
+        },
+      ];
     const [records, total] = await Promise.all([
       this.prisma.attendance.findMany({
         where,
-        skip,
+        skip: (page - 1) * limit,
         take: limit,
         orderBy: [{ attendanceDate: 'desc' }, { scannedAt: 'desc' }],
-        include: {
-          student: {
-            select: {
-              nisn: true,
-              name: true,
-              schoolName: true,
-              gender: true,
-              foodRestrictions: true,
-              photoPath: true,
-            },
-          },
-          staff: {
-            select: { name: true, username: true },
-          },
-        },
+        include: attendanceInclude,
       }),
       this.prisma.attendance.count({ where }),
     ]);
-
-    const formattedRecords = records.map((r: any) => ({
-      id: r.id,
-      attendanceDate: format(
-        toZonedTime(r.attendanceDate, TIMEZONE),
-        'yyyy-MM-dd',
-        { timeZone: TIMEZONE },
-      ),
-      scannedAt: toZonedTime(r.scannedAt, TIMEZONE)
-        .toISOString()
-        .replace('Z', '+07:00'),
-      status: r.status,
-      student: r.student,
-      scannedBy: r.staff,
-    }));
-
     return {
-      data: formattedRecords,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      data: records.map((r) => this.formatRecord(r)),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
   async findOne(id: string) {
     const record = await this.prisma.attendance.findUnique({
       where: { id },
-      include: {
-        student: {
-          select: {
-            nisn: true,
-            name: true,
-            schoolName: true,
-            gender: true,
-            foodRestrictions: true,
-            photoPath: true,
-          },
-        },
-        staff: { select: { name: true, username: true } },
-      },
+      include: attendanceInclude,
     });
+    if (!record) throw new NotFoundException('Data absensi tidak ditemukan');
+    return this.formatRecord(record);
+  }
 
-    if (!record) {
-      throw new NotFoundException(`Data absensi tidak ditemukan`);
-    }
+  private formatTime(date: Date) {
+    return formatInTimeZone(date, TIMEZONE, "yyyy-MM-dd'T'HH:mm:ssXXX");
+  }
 
-    const jakartaDate = toZonedTime(record.attendanceDate, TIMEZONE);
-    const jakartaScanned = toZonedTime(record.scannedAt, TIMEZONE);
-
+  private formatRecord(
+    record: Prisma.AttendanceGetPayload<{ include: typeof attendanceInclude }>,
+  ) {
     return {
       id: record.id,
-      attendanceDate: format(jakartaDate, 'yyyy-MM-dd', { timeZone: TIMEZONE }),
-      scannedAt: jakartaScanned.toISOString().replace('Z', '+07:00'),
+      attendanceDate: record.attendanceDate.toISOString().slice(0, 10),
+      scannedAt: this.formatTime(record.scannedAt),
       status: record.status,
       student: record.student,
+      beneficiary3B: record.beneficiary3B,
+      recipient: this.formatRecipient(record.student, record.beneficiary3B),
       scannedBy: record.staff,
     };
   }
 
-  private formatStudent(student: {
-    name: string;
-    nisn: string;
-    schoolName: string;
-    gender: string;
-    foodRestrictions: string | null;
-    photoPath: string | null;
-  }) {
+  private formatRecipient(
+    student: StudentData | null,
+    beneficiary: BeneficiaryData | null,
+  ) {
+    const person = student || beneficiary!;
     return {
-      name: student.name,
-      nisn: student.nisn,
-      schoolName: student.schoolName,
-      gender: student.gender === 'LAKI_LAKI' ? 'Laki-laki' : 'Perempuan',
-      foodRestrictions: student.foodRestrictions,
-      photoUrl: student.photoPath
-        ? `${process.env.BACKEND_URL || 'http://localhost:3000'}${student.photoPath}`
-        : null,
+      type: student ? ('STUDENT' as const) : ('THREE_B_ELDERLY' as const),
+      name: person.name,
+      identifier: student ? student.nisn : beneficiary!.nik,
+      schoolName: student?.schoolName,
+      gender: student?.gender,
+      address: beneficiary
+        ? `${beneficiary.street}, RT ${beneficiary.rt}/RW ${beneficiary.rw}, ${beneficiary.kelurahan}, ${beneficiary.kecamatan}, ${beneficiary.city}, ${beneficiary.province} ${beneficiary.postalCode}`
+        : undefined,
+      decile: beneficiary?.decile,
+      foodRestrictions: person.foodRestrictions,
+      photoUrl: person.photoPath,
     };
   }
 }

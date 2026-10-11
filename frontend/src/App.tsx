@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import BottomNav from './components/BottomNav';
 import { useAuth } from './context/AuthContext';
 
+const BeneficiariesPage = lazy(() => import('./pages/BeneficiariesPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const ScanPage = lazy(() => import('./pages/ScanPage'));
 const AttendancePage = lazy(() => import('./pages/AttendancePage'));
@@ -48,6 +49,7 @@ const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
+        <Route path="/beneficiaries-3b" element={<ProtectedRoute><div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}><BeneficiariesPage /><BottomNav /></div></ProtectedRoute>} />
         <Route path="/students" element={<Navigate to="/admin" replace />} />
         <Route
           path="/attendance"

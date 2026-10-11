@@ -1,3 +1,4 @@
+import { BeneficiariesModule } from './beneficiaries/beneficiaries.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
@@ -13,6 +14,7 @@ import { AppService } from './app.service';
     PrismaModule,
     AuthModule,
     StudentsModule,
+    BeneficiariesModule,
     AttendanceModule,
   ],
   controllers: [AppController],

@@ -787,7 +787,23 @@
     color: black !important;
   }
 
-  .modal-overlay, .modal-footer, .qr-action-buttons, .modal-header {
+  .modal-footer, .qr-action-buttons, .modal-header {
     display: none !important;
   }
+}
+
+.beneficiary-tabs { display: flex; gap: 12px; margin: 20px 0; }
+.recipient-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.recipient-address { max-width: 320px; white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .recipient-form-grid { grid-template-columns: 1fr; } }
+@media print { .beneficiary-tabs { display: none; } }
+
+@media print {
+  .modal-overlay { position: absolute; display: block; background: none; backdrop-filter: none; padding: 0; }
+  .print-area { max-height: none; overflow: visible; box-shadow: none; border: 0; }
+  .student-id-card * { color: black !important; }
+}
+@media (max-width: 768px) {
+  .students-table td[data-label="Alamat"] { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .students-table td[data-label="Alamat"] .recipient-address { max-width: 100%; }
 }

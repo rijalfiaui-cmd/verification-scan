@@ -1,8 +1,9 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import './BottomNav.css';
 
 const BottomNav: React.FC = () => {
+  const { pathname } = useLocation();
   return (
     <nav className="nav-tabs safe-bottom">
       <NavLink
@@ -15,11 +16,11 @@ const BottomNav: React.FC = () => {
       </NavLink>
       <NavLink
         to="/admin"
-        className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}
+        className={({ isActive }) => `nav-tab ${isActive || pathname === '/beneficiaries-3b' ? 'active' : ''}`}
         id="nav-admin"
       >
         <span className="nav-tab-icon">👥</span>
-        <span>Data Siswa</span>
+        <span>Penerima Manfaat</span>
       </NavLink>
       <NavLink
         to="/attendance"

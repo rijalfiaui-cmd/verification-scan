@@ -1,7 +1,21 @@
 import api from './client';
 
+export type RecipientType = 'STUDENT' | 'THREE_B_ELDERLY';
+export interface Recipient {
+  type: RecipientType;
+  name: string;
+  identifier: string;
+  schoolName?: string;
+  gender?: string;
+  address?: string;
+  decile?: number;
+  foodRestrictions: string | null;
+  photoUrl: string | null;
+}
+
 export interface ScanResult {
-  status: 'recorded' | 'already_present' | 'invalid_qr' | 'inactive_student';
+  recipient?: Recipient;
+  status: 'recorded' | 'already_present' | 'invalid_qr' | 'inactive_student' | 'inactive_beneficiary';
   message: string;
   student?: {
     name: string;
@@ -19,6 +33,7 @@ export interface ScanResult {
 }
 
 export interface AttendanceRecord {
+  recipient: Recipient;
   id: string;
   attendanceDate: string;
   scannedAt: string;
@@ -30,7 +45,7 @@ export interface AttendanceRecord {
     gender: string;
     foodRestrictions: string | null;
     photoPath: string | null;
-  };
+  } | null;
   scannedBy: {
     name: string;
     username: string;
@@ -55,6 +70,7 @@ export const attendanceApi = {
     limit?: number;
     date?: string;
     search?: string;
+    type?: RecipientType;
   }): Promise<{ data: AttendanceRecord[]; meta: AttendanceMeta }> => {
     const res = await api.get('/attendance', { params });
     return res.data;
