@@ -38,7 +38,7 @@ Copy `frontend/.env.example` to `frontend/.env` and fill in the project values f
 
 ```env
 VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-VITE_SUPABASE_ANON_KEY=YOUR_PUBLISHABLE_OR_ANON_KEY
+VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
 ```
 
 The publishable/anon key is intended for browser use. Never put the `service_role` key in the frontend or in Vercel.
@@ -60,7 +60,7 @@ The simplest route is Vercel:
 2. Import it at Vercel.
 3. Set **Root Directory** to `frontend`.
 4. Keep Framework Preset as **Vite**.
-5. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as environment variables.
+5. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` as environment variables.
 6. Deploy.
 
 `frontend/vercel.json` provides the SPA fallback required by React Router.
