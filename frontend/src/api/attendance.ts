@@ -1,4 +1,4 @@
-import api from './client';
+import { supabase } from './supabase';
 
 export type RecipientType = 'STUDENT' | 'THREE_B_ELDERLY';
 export interface Recipient {
@@ -10,26 +10,14 @@ export interface Recipient {
   address?: string;
   decile?: number;
   foodRestrictions: string | null;
-  photoUrl: string | null;
+  photoUrl: null;
 }
 
 export interface ScanResult {
   recipient?: Recipient;
   status: 'recorded' | 'already_present' | 'invalid_qr' | 'inactive_student' | 'inactive_beneficiary';
   message: string;
-  student?: {
-    name: string;
-    nisn: string;
-    schoolName: string;
-    gender?: string;
-    foodRestrictions?: string | null;
-    photoUrl?: string | null;
-  };
-  attendance?: {
-    date: string;
-    time: string;
-    id?: string;
-  };
+  attendance?: { date: string; time: string; id?: string };
 }
 
 export interface AttendanceRecord {
@@ -38,18 +26,8 @@ export interface AttendanceRecord {
   attendanceDate: string;
   scannedAt: string;
   status: string;
-  student: {
-    name: string;
-    nisn: string;
-    schoolName: string;
-    gender: string;
-    foodRestrictions: string | null;
-    photoPath: string | null;
-  } | null;
-  scannedBy: {
-    name: string;
-    username: string;
-  };
+  student: null;
+  scannedBy: { name: string; username: string };
 }
 
 export interface AttendanceMeta {
@@ -61,8 +39,9 @@ export interface AttendanceMeta {
 
 export const attendanceApi = {
   scan: async (qrToken: string): Promise<ScanResult> => {
-    const res = await api.post<ScanResult>('/attendance/scan', { qrToken });
-    return res.data;
+    const { data, error } = await supabase.rpc('scan_attendance', { p_qr_token: qrToken });
+    if (error) throw error;
+    return data as ScanResult;
   },
 
   getAll: async (params: {
@@ -72,12 +51,14 @@ export const attendanceApi = {
     search?: string;
     type?: RecipientType;
   }): Promise<{ data: AttendanceRecord[]; meta: AttendanceMeta }> => {
-    const res = await api.get('/attendance', { params });
-    return res.data;
-  },
-
-  getOne: async (id: string): Promise<AttendanceRecord> => {
-    const res = await api.get(`/attendance/${id}`);
-    return res.data;
+    const { data, error } = await supabase.rpc('list_attendance', {
+      p_page: params.page || 1,
+      p_limit: params.limit || 20,
+      p_date: params.date || undefined,
+      p_search: params.search || undefined,
+      p_type: params.type || undefined,
+    });
+    if (error) throw error;
+    return data as { data: AttendanceRecord[]; meta: AttendanceMeta };
   },
 };

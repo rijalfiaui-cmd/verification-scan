@@ -11,16 +11,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   if (isLoading) {
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        flexDirection: 'column',
-        gap: '16px',
-      }}>
-        <div className="spinner spinner-lg" style={{ borderTopColor: '#3b82f6', borderColor: 'rgba(59,130,246,0.3)' }} />
-        <p style={{ color: 'var(--color-text-muted)' }}>Memuat...</p>
+      <div className="app-loading" role="status" aria-label="Memuat sesi">
+        <div className="app-loading-header skeleton" />
+        <div className="app-loading-panel skeleton" />
+        <div className="app-loading-line skeleton" />
       </div>
     );
   }

@@ -6,9 +6,10 @@ import {
   type Beneficiary,
   type BeneficiaryPayload,
 } from "../api/beneficiaries";
-import { apiErrorMessage, photoUrl } from "../api/client";
+import { apiErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
-import PhotoInput from "../components/PhotoInput";
+import QrCode from "../components/QrCode";
+import { downloadQrCode } from "../utils/qr";
 import "./AdminStudentsPage.css";
 
 const emptyForm = (): BeneficiaryPayload => ({
@@ -49,7 +50,6 @@ export default function BeneficiariesPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Beneficiary | null>(null);
   const [form, setForm] = useState<BeneficiaryPayload>(emptyForm);
-  const [photo, setPhoto] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [qr, setQr] = useState<Beneficiary | null>(null);
@@ -112,7 +112,6 @@ export default function BeneficiariesPage() {
           }
         : emptyForm(),
     );
-    setPhoto(null);
     setFormError("");
     setOpen(true);
   };
@@ -141,28 +140,12 @@ export default function BeneficiariesPage() {
     setSaving(true);
     setFormError("");
     try {
-      let saved = editing
+      const saved = editing
         ? await beneficiariesApi.update(editing.id, form)
         : await beneficiariesApi.create(form);
-      // Remember the created record so retrying a failed photo upload does not create a duplicate.
       setEditing(saved);
       setRefresh((value) => value + 1);
-      if (photo) {
-        try {
-          saved = {
-            ...saved,
-            ...(await beneficiariesApi.photo(saved.id, photo)),
-          };
-        } catch (err) {
-          setFormError(
-            `Data sudah tersimpan. ${apiErrorMessage(err, "Foto gagal diunggah. Coba Simpan kembali.")}`,
-          );
-          return;
-        }
-      }
-      setRefresh((value) => value + 1);
       setOpen(false);
-      setPhoto(null);
       await viewQr(saved);
     } catch (err) {
       setFormError(apiErrorMessage(err, "Gagal menyimpan penerima manfaat."));
@@ -266,15 +249,7 @@ export default function BeneficiariesPage() {
                   <tr key={item.id}>
                     <td data-label="Penerima Manfaat">
                       <div className="student-profile-cell">
-                        {item.photoPath ? (
-                          <img
-                            className="student-avatar"
-                            src={photoUrl(item.photoPath)}
-                            alt={item.name}
-                          />
-                        ) : (
-                          <div className="student-avatar">{item.name[0]}</div>
-                        )}
+                        <div className="student-avatar">{item.name[0]}</div>
                         <div className="student-meta">
                           <span className="student-name-text">{item.name}</span>
                           <span className="student-nisn-badge">
@@ -499,12 +474,6 @@ export default function BeneficiariesPage() {
                     />{" "}
                     Aktif (dapat melakukan absensi)
                   </label>
-                  <PhotoInput
-                    value={photo}
-                    onChange={setPhoto}
-                    existingUrl={editing?.photoPath}
-                    disabled={saving}
-                  />
                 </div>
                 <div className="modal-footer">
                   <button
@@ -556,8 +525,8 @@ export default function BeneficiariesPage() {
                   <span>{qr.isActive ? "AKTIF" : "NONAKTIF"}</span>
                 </div>
                 <div className="qr-image-wrapper">
-                  {qr.qrDataUrl ? (
-                    <img src={qr.qrDataUrl} alt={`QR ${qr.name}`} />
+                  {qr.qrToken ? (
+                    <QrCode id="beneficiary-qr-canvas" value={qr.qrToken} label={`QR ${qr.name}`} />
                   ) : (
                     <p role="status">{qrError || "Memuat QR…"}</p>
                   )}
@@ -574,18 +543,17 @@ export default function BeneficiariesPage() {
                 </div>
               </div>
               <div className="qr-action-buttons">
-                {qr.qrDataUrl && (
-                  <a
+                {qr.qrToken && (
+                  <button
                     className="btn btn-primary"
-                    href={qr.qrDataUrl}
-                    download={`QR_3BL_${qr.nik}.png`}
+                    onClick={() => downloadQrCode('beneficiary-qr-canvas', `QR_3BL_${qr.nik}.png`)}
                   >
                     Unduh QR (.png)
-                  </a>
+                  </button>
                 )}
                 <button
                   className="btn btn-secondary"
-                  disabled={!qr.qrDataUrl}
+                  disabled={!qr.qrToken}
                   onClick={() => window.print()}
                 >
                   Cetak Kartu

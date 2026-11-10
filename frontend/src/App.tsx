@@ -12,8 +12,10 @@ const AttendancePage = lazy(() => import('./pages/AttendancePage'));
 const AdminStudentsPage = lazy(() => import('./pages/AdminStudentsPage'));
 
 const LoadingFallback = () => (
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-    <div className="spinner spinner-lg" style={{ borderTopColor: '#3b82f6', borderColor: 'rgba(59,130,246,0.3)' }} />
+  <div className="app-loading" role="status" aria-label="Memuat aplikasi">
+    <div className="app-loading-header skeleton" />
+    <div className="app-loading-panel skeleton" />
+    <div className="app-loading-line skeleton" />
   </div>
 );
 

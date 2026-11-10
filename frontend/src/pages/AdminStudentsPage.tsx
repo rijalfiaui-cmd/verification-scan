@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { studentsApi, type Student, type CreateStudentPayload } from '../api/students';
 import { useAuth } from '../context/AuthContext';
 import './AdminStudentsPage.css';
-import PhotoInput from '../components/PhotoInput';
-import { photoUrl, apiErrorMessage } from '../api/client';
+import { apiErrorMessage } from '../api/client';
 import { NavLink } from 'react-router-dom';
+import QrCode from '../components/QrCode';
+import { downloadQrCode } from '../utils/qr';
 
 const AdminStudentsPage: React.FC = () => {
   const { staff, logout } = useAuth();
@@ -28,13 +29,9 @@ const AdminStudentsPage: React.FC = () => {
     foodRestrictions: '',
     isActive: true,
   });
-  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
-  const [editPhoto, setEditPhoto] = useState<File | null>(null);
-
   // State Modal QR Code Viewer
-  const [activeQrStudent, setActiveQrStudent] = useState<(Student & { qrDataUrl?: string }) | null>(null);
+  const [activeQrStudent, setActiveQrStudent] = useState<Student | null>(null);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
-  const [isQrLoading, setIsQrLoading] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
 
   // State Modal Edit Siswa
@@ -73,7 +70,6 @@ const AdminStudentsPage: React.FC = () => {
       foodRestrictions: '',
       isActive: true,
     });
-    setSelectedPhoto(null);
     setFormError('');
   };
 
@@ -105,27 +101,11 @@ const AdminStudentsPage: React.FC = () => {
         foodRestrictions: formData.foodRestrictions?.trim() || undefined,
       };
 
-      // 1. Simpan siswa & langsung generate QR code
       const newStudent = await studentsApi.create(payload);
-
-      // 2. Upload foto jika dipilih
-      let updatedWithPhoto = newStudent;
-      if (selectedPhoto) {
-        try {
-          const photoRes = await studentsApi.uploadPhoto(newStudent.id, selectedPhoto);
-          updatedWithPhoto = { ...newStudent, photoPath: photoRes.photoPath };
-        } catch {
-          alert('Data siswa berhasil disimpan, tetapi foto gagal diunggah. Buka Edit untuk mencoba unggah foto lagi.');
-        }
-      }
-
-      // 3. Tutup form modal, reset, dan langsung buka Modal QR Code
       setIsAddModalOpen(false);
       resetAddForm();
       await fetchStudents();
-
-      // Buka preview QR code kartu siswa yang baru dibuat!
-      setActiveQrStudent(updatedWithPhoto);
+      setActiveQrStudent(newStudent);
       setIsQrModalOpen(true);
     } catch (err: unknown) {
       interface ErrorResponse {
@@ -149,26 +129,18 @@ const AdminStudentsPage: React.FC = () => {
   const handleViewQr = async (student: Student) => {
     setActiveQrStudent(student);
     setIsQrModalOpen(true);
-    setIsQrLoading(true);
     try {
       const res = await studentsApi.getQrCode(student.id);
-      setActiveQrStudent({ ...student, qrDataUrl: res.qrDataUrl });
+      setActiveQrStudent({ ...student, qrToken: res.qrToken });
     } catch {
       alert('Gagal mengambil QR code');
-    } finally {
-      setIsQrLoading(false);
     }
   };
 
   // Download QR Code sebagai file PNG
   const handleDownloadQr = () => {
-    if (!activeQrStudent?.qrDataUrl) return;
-    const link = document.createElement('a');
-    link.href = activeQrStudent.qrDataUrl;
-    link.download = `QR_${activeQrStudent.nisn}_${activeQrStudent.name.replace(/\s+/g, '_')}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (!activeQrStudent) return;
+    downloadQrCode('student-qr-canvas', `QR_${activeQrStudent.nisn}_${activeQrStudent.name.replace(/\s+/g, '_')}.png`);
   };
 
   // Salin Token
@@ -195,7 +167,6 @@ const AdminStudentsPage: React.FC = () => {
   // Edit Siswa
   const handleOpenEdit = (student: Student) => {
     setEditingStudent(student);
-    setEditPhoto(null);
     setFormError('');
     setIsEditModalOpen(true);
   };
@@ -212,13 +183,6 @@ const AdminStudentsPage: React.FC = () => {
         foodRestrictions: editingStudent.foodRestrictions || '',
         isActive: editingStudent.isActive,
       });
-      if (editPhoto) {
-        try { await studentsApi.uploadPhoto(editingStudent.id, editPhoto); }
-        catch (error) {
-          setFormError(apiErrorMessage(error, 'Data siswa tersimpan, tetapi foto gagal diunggah. Coba simpan kembali.'));
-          return;
-        }
-      }
       setIsEditModalOpen(false);
       setEditingStudent(null);
       await fetchStudents();
@@ -393,20 +357,9 @@ const AdminStudentsPage: React.FC = () => {
                 <tr key={student.id}>
                   <td data-label="Siswa">
                     <div className="student-profile-cell">
-                      {student.photoPath ? (
-                        <img
-                          src={photoUrl(student.photoPath)}
-                          alt={student.name}
-                          className="student-avatar"
-                          onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div className="student-avatar">
-                          {student.name.charAt(0).toUpperCase()}
-                        </div>
-                      )}
+                      <div className="student-avatar">
+                        {student.name.charAt(0).toUpperCase()}
+                      </div>
                       <div className="student-meta">
                         <span className="student-name-text">{student.name}</span>
                         <span className="student-nisn-badge">NISN: {student.nisn}</span>
@@ -602,7 +555,6 @@ const AdminStudentsPage: React.FC = () => {
                   </small>
                 </div>
 
-                <PhotoInput value={selectedPhoto} onChange={setSelectedPhoto} disabled={isSubmitting} />
               </div>
 
               <div className="modal-footer">
@@ -668,13 +620,7 @@ const AdminStudentsPage: React.FC = () => {
 
                 {/* QR Code Container */}
                 <div className="qr-image-wrapper">
-                  {isQrLoading || !activeQrStudent.qrDataUrl ? (
-                    <div style={{ width: 200, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <div className="spinner spinner-lg" />
-                    </div>
-                  ) : (
-                    <img src={activeQrStudent.qrDataUrl} alt={`QR Code ${activeQrStudent.name}`} />
-                  )}
+                  <QrCode id="student-qr-canvas" value={activeQrStudent.qrToken} label={`QR Code ${activeQrStudent.name}`} />
                 </div>
 
                 <div className="card-student-details">
@@ -696,7 +642,6 @@ const AdminStudentsPage: React.FC = () => {
                 <button
                   className="btn btn-primary btn-full"
                   onClick={handleDownloadQr}
-                  disabled={!activeQrStudent.qrDataUrl}
                 >
                   <span>📥</span>
                   <span>Unduh Gambar QR (.png)</span>
@@ -753,7 +698,6 @@ const AdminStudentsPage: React.FC = () => {
             <form onSubmit={handleEditSubmit}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {formError && <div className="alert alert-error" role="alert">{formError}</div>}
-                <PhotoInput value={editPhoto} onChange={setEditPhoto} existingUrl={editingStudent.photoPath} disabled={isSubmitting} />
                 <div className="form-group">
                   <label className="form-label">NISN (Tetap)</label>
                   <input

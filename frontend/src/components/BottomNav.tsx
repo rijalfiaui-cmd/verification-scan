@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import './BottomNav.css';
+import Icon from './Icon';
 
 const BottomNav: React.FC = () => {
   const { pathname } = useLocation();
@@ -11,7 +12,7 @@ const BottomNav: React.FC = () => {
         className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}
         id="nav-scan"
       >
-        <span className="nav-tab-icon">📷</span>
+        <Icon className="nav-tab-icon" name="camera" />
         <span>Scan QR</span>
       </NavLink>
       <NavLink
@@ -19,7 +20,7 @@ const BottomNav: React.FC = () => {
         className={({ isActive }) => `nav-tab ${isActive || pathname === '/beneficiaries-3b' ? 'active' : ''}`}
         id="nav-admin"
       >
-        <span className="nav-tab-icon">👥</span>
+        <Icon className="nav-tab-icon" name="users" />
         <span>Penerima Manfaat</span>
       </NavLink>
       <NavLink
@@ -27,7 +28,7 @@ const BottomNav: React.FC = () => {
         className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}
         id="nav-attendance"
       >
-        <span className="nav-tab-icon">📊</span>
+        <Icon className="nav-tab-icon" name="chart" />
         <span>Rekap</span>
       </NavLink>
     </nav>

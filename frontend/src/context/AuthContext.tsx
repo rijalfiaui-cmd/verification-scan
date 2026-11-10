@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authApi } from '../api/auth';
+import { supabase } from '../api/supabase';
 
 interface Staff {
   id: string;
@@ -21,31 +22,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('staff');
+    void supabase.auth.signOut();
     setStaff(null);
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    const savedStaff = localStorage.getItem('staff');
-
-    if (token && savedStaff) {
+    let active = true;
+    const loadSession = async () => {
       try {
-        setStaff(JSON.parse(savedStaff));
-        // Verifikasi token masih valid
-        authApi.getMe().catch(() => logout());
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) return;
+        const profile = await authApi.getMe();
+        if (active && profile.isActive) {
+          setStaff({ id: profile.id, username: profile.username, name: profile.name });
+        }
       } catch {
-        logout();
+        if (active) logout();
+      } finally {
+        if (active) setIsLoading(false);
       }
-    }
-    setIsLoading(false);
+    };
+    void loadSession();
+
+    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT' && active) setStaff(null);
+    });
+
+    return () => {
+      active = false;
+      subscription.subscription.unsubscribe();
+    };
   }, [logout]);
 
   const login = async (username: string, password: string) => {
     const response = await authApi.login(username, password);
-    localStorage.setItem('access_token', response.accessToken);
-    localStorage.setItem('staff', JSON.stringify(response.staff));
     setStaff(response.staff);
   };
 

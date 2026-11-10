@@ -1,5 +1,4 @@
 import type { Recipient } from "../api/attendance";
-import { photoUrl } from "../api/client";
 import "./StudentCard.css";
 
 export default function RecipientCard({
@@ -14,15 +13,7 @@ export default function RecipientCard({
     <div className="student-card card">
       <div className="student-card-header">
         <div className="student-photo">
-          {recipient.photoUrl ? (
-            <img
-              className="student-photo-img"
-              src={photoUrl(recipient.photoUrl)}
-              alt={recipient.name}
-            />
-          ) : (
-            <div className="student-photo-placeholder">{recipient.name[0]}</div>
-          )}
+          <div className="student-photo-placeholder">{recipient.name[0]}</div>
         </div>
         <div>
           <span className="badge">{isStudent ? "Siswa" : "3B-Lansia"}</span>

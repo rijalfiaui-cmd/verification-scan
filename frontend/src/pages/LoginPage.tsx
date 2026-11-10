@@ -84,11 +84,7 @@ const LoginPage: React.FC = () => {
       await login(username.trim(), password);
       navigate('/scan');
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      setError(
-        axiosErr.response?.data?.message ||
-        'Gagal terhubung ke server. Periksa koneksi internet Anda.'
-      );
+      setError(err instanceof Error ? err.message : 'Gagal terhubung ke Supabase. Periksa koneksi internet Anda.');
     } finally {
       setIsLoading(false);
     }
